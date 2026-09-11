@@ -125,18 +125,21 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/v1/records' && req.method === 'GET') {
     const limit = Math.min(100, +(url.searchParams.get('limit') || 50));
     const offset = Math.max(0, +(url.searchParams.get('offset') || 0));
+    let unreadable = 0;
+    const loadRec = f => { try { return JSON.parse(fs.readFileSync(path.join(RECDIR, f), 'utf8')); } catch { unreadable++; return null; } };
     const all = fs.readdirSync(RECDIR).filter(f => f.endsWith('.json'))
-      .map(f => JSON.parse(fs.readFileSync(path.join(RECDIR, f), 'utf8')).record)
-      .filter(r => r.site === key.site)
+      .map(loadRec).filter(Boolean)
+      .map(j => j.record)
+      .filter(r => r && r.site === key.site)
       .sort((a, b) => b.received_at.localeCompare(a.received_at));
-    return send(200, {site: key.site, total: all.length, offset, records: all.slice(offset, offset + limit)});
+    return send(200, {site: key.site, total: all.length, unreadable, offset, records: all.slice(offset, offset + limit)});
   }
 
   const rm = /^\/v1\/records\/(REC-[0-9a-f]{12})$/.exec(url.pathname);
   if (rm && req.method === 'GET') {
     const p = path.join(RECDIR, rm[1] + '.json');
     if (!fs.existsSync(p)) return send(404, {error: 'not found'});
-    const rec = JSON.parse(fs.readFileSync(p, 'utf8'));
+    let rec; try { rec = JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return send(422, {error: 'record file is unreadable on disk'}); }
     if (rec.record.site !== key.site) return send(403, {error: 'record belongs to another site'});
     res.writeHead(200, {'content-type': 'application/json', 'access-control-allow-origin': '*'}); return res.end(fs.readFileSync(p));
   }
