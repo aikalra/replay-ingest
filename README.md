@@ -47,6 +47,9 @@ broken entry. Editing or deleting any historical entry - including its metadata 
 breaks every subsequent link. This mirrors the hash-chained ledger the browser demos
 show, but server-side where a buyer's auditor can run it.
 
+**Listing.** `GET /v1/records?limit=&offset=` returns the calling site's record headers,
+newest first, capped at 100 per call. A site never sees another site's records.
+
 **Idempotency.** Re-posting identical payload bytes returns the existing record id with
 `duplicate: true` and does not append to the ledger.
 
@@ -77,4 +80,7 @@ node service.mjs                          # listens on :8790 (PORT to override)
 node generate.mjs property 500 7 > sample.json   # valid synthetic payload, seeded
 curl -X POST http://127.0.0.1:8790/v1/ingest \
   -H "Authorization: Bearer rk_..." -H 'content-type: application/json' -d @sample.json
+
+# or post a raw telemetry file directly - the same CSV/JSONL the browser demos accept:
+node upload.mjs accident week1.csv https://<host> rk_<site>_<key>
 ```
