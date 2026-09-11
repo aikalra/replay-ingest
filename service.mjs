@@ -87,9 +87,11 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/v1/ingest' && req.method === 'POST') {
-    let body = '';
-    req.on('data', c => { body += c; if (body.length > 5e6) req.destroy(); });
+    if ((+req.headers['content-length'] || 0) > 5e6) return send(413, {error: 'payload exceeds the 5MB cap'});
+    let body = '', tooBig = false;
+    req.on('data', c => { if (tooBig) return; body += c; if (body.length > 5e6) { tooBig = true; send(413, {error: 'payload exceeds the 5MB cap'}); } });
     req.on('end', () => {
+      if (tooBig) return;
       let payload; try { payload = JSON.parse(body); } catch { return send(400, {error: 'body must be JSON'}); }
       const rows = payload.rows;
       if (!Array.isArray(rows) || !rows.length) return send(400, {error: 'rows must be a non-empty array'});
