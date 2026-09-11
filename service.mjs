@@ -35,8 +35,12 @@ const SCHEMAS = {
 };
 
 const server = http.createServer((req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS'});
+    return res.end();
+  }
   const url = new URL(req.url, 'http://x');
-  const send = (code, obj) => { res.writeHead(code, {'content-type': 'application/json'}); res.end(JSON.stringify(obj)); };
+  const send = (code, obj) => { res.writeHead(code, {'content-type': 'application/json', 'access-control-allow-origin': '*'}); res.end(JSON.stringify(obj)); };
 
   if (url.pathname === '/v1/health') return send(200, {ok: true, service: 'replay-ingest', version: '0.1.0'});
 
@@ -98,7 +102,7 @@ const server = http.createServer((req, res) => {
     if (!fs.existsSync(p)) return send(404, {error: 'not found'});
     const rec = JSON.parse(fs.readFileSync(p, 'utf8'));
     if (rec.record.site !== key.site) return send(403, {error: 'record belongs to another site'});
-    res.writeHead(200, {'content-type': 'application/json'}); return res.end(fs.readFileSync(p));
+    res.writeHead(200, {'content-type': 'application/json', 'access-control-allow-origin': '*'}); return res.end(fs.readFileSync(p));
   }
   return send(404, {error: 'unknown route'});
 });
