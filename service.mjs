@@ -21,7 +21,8 @@ const RATE = new Map(); // keyHash -> timestamps[]
 function loadKeys() { try { return JSON.parse(fs.readFileSync(KEYS, 'utf8')); } catch { return {}; } }
 function lastChain() {
   const lines = fs.readFileSync(LEDGER, 'utf8').trim().split('\n').filter(Boolean);
-  return lines.length ? JSON.parse(lines[lines.length - 1]).chain_hash : GENESIS;
+  if (!lines.length) return GENESIS;
+  try { return JSON.parse(lines[lines.length - 1]).chain_hash; } catch { return null; } // unparseable tail = corrupt ledger
 }
 function rateOk(kh) {
   const now = Date.now(), w = (RATE.get(kh) || []).filter(t => now - t < 60000);
@@ -53,7 +54,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/v1/audit/verify' && req.method === 'GET') {
     let prev = GENESIS, n = 0, ok = true, badAt = null;
     for (const line of fs.readFileSync(LEDGER, 'utf8').trim().split('\n').filter(Boolean)) {
-      const e = JSON.parse(line); n++;
+      let e; try { e = JSON.parse(line); } catch { ok = false; badAt = n + 1; break; } n++;
       const expect = sha(prev + JSON.stringify({seq: e.seq, ts: e.ts, site: e.site, engine: e.engine, record_hash: e.record_hash}));
       if (e.chain_hash !== expect || e.prev_hash !== prev) { ok = false; badAt = n; break; }
       prev = e.chain_hash;
@@ -109,6 +110,7 @@ const server = http.createServer((req, res) => {
       };
       const dup = fs.existsSync(path.join(RECDIR, record.record_id + '.json'));
       const prev = lastChain();
+      if (prev === null) return send(500, {error: 'audit ledger is corrupt on disk; refusing to append - check /v1/audit/verify'});
       const entry = {seq: fs.readFileSync(LEDGER, 'utf8').trim().split('\n').filter(Boolean).length + 1,
         ts: record.received_at, site: key.site, engine: key.engine,
         record_hash: record.payload_hash, prev_hash: prev};
