@@ -23,6 +23,20 @@ server-side reconstructions, and the rehearsal asserts tenant isolation, reconst
 presence, and audit-chain integrity - 17 checks, then prints each incident's computed
 summary. Nothing leaves 127.0.0.1. This is the demo to run in front of John or Rohan.
 
+## Step 0c - rehearse the multi-week pilot (longitudinal)
+
+```bash
+node pilot-longitudinal.mjs
+```
+
+The same three fictional tenants upload weekly incidents across four weeks of
+backdated synthetic history. The rehearsal then derives the longitudinal patterns a
+buyer actually buys for, from the stored records themselves: repeat claimants (same
+person falling twice, weeks apart), repeat same-origin losses (same crawl space
+failing twice), and staged-event indicators (repeated low-delta-v events with no
+pre-impact braking). 22 checks assert each planted pattern surfaces and each one-off
+stays unflagged; the audit chain stays intact across the full 12-ingest history.
+
 ## Step 1 - host the service (30 minutes, ~$5/mo)
 
 Any single-container host works - a small VPS, Fly.io, Railway:
