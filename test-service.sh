@@ -32,4 +32,10 @@ echo "old key after rotation: $(curl -s -o /dev/null -w '%{http_code}' $B/v1/rec
 echo "new key ingests: $(curl -s -o /dev/null -w '%{http_code}' -X POST $B/v1/ingest -H "Authorization: Bearer $NEWK" -H 'content-type: application/json' -d '{"engine":"liability","rows":[{"ts":"22:01","entity":"P-300","zone":"bar"}]}')"
 echo "revoke: $(curl -s -X POST $B/v1/keys/revoke -H "Authorization: Bearer $NEWK")"
 echo "revoked key: $(curl -s -o /dev/null -w '%{http_code}' -X POST $B/v1/ingest -H "Authorization: Bearer $NEWK" -H 'content-type: application/json' -d '{"engine":"liability","rows":[{"ts":"22:02","entity":"P-301","zone":"bar"}]}')"
+echo "records list: $(curl -s "$B/v1/records?limit=10" -H "Authorization: Bearer $KA" | python3 -c "import sys,json;d=json.load(sys.stdin);print(str(d['total'])+' record(s) for '+d['site'])")"
+echo "records list cross-site isolation: $(curl -s "$B/v1/records" -H "Authorization: Bearer $KP" | python3 -c "import sys,json;print(json.load(sys.stdin)['total'])") (oakwood sees only its own)"
+printf 'time,speed,brake\n0.0,61.2,0\n0.1,59.0,42\n0.2,55.1,88\n0.3,44.0,100\n0.5,32.0,100\n' > $DATA_DIR/upl-test.csv
+echo "uploader CLI: $(node upload.mjs accident $DATA_DIR/upl-test.csv $B $KA 2>/dev/null | head -1)"
+printf 'name,color\nalice,blue\n' > $DATA_DIR/not-telemetry.csv
+echo "uploader rejects non-telemetry: $(node upload.mjs property $DATA_DIR/not-telemetry.csv $B $KP 2>&1 | head -1)"
 kill $SRV
