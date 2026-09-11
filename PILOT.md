@@ -9,6 +9,20 @@ One engine, one buyer, one site. The engines share this service, so the choice i
 commercial, not technical: whichever of John / Rohan can put one real site or one real
 fleet's data in our hands first.
 
+## Step 0b - rehearse the whole pilot with fictional tenants (5 minutes, $0)
+
+Before any buyer call, the full loop runs end-to-end locally with synthetic tenants:
+
+```bash
+node pilot-sim.mjs
+```
+
+Three fictional sites (acme-markets-store-042 / liability, apex-logistics-fleet-7 /
+accident, maplewood-residence / property) get real keys, post synthetic incidents, get
+server-side reconstructions, and the rehearsal asserts tenant isolation, reconstruction
+presence, and audit-chain integrity - 17 checks, then prints each incident's computed
+summary. Nothing leaves 127.0.0.1. This is the demo to run in front of John or Rohan.
+
 ## Step 1 - host the service (30 minutes, ~$5/mo)
 
 Any single-container host works - a small VPS, Fly.io, Railway:
