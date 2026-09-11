@@ -49,7 +49,14 @@ async function load(){
     ch.textContent=audit.ok?'INTACT':'BROKEN at entry '+audit.break_at;
     ch.className=audit.ok?'ok':'warn';
     const t=document.getElementById('recs');
-    t.innerHTML=recs.j.records.map(r=>'<tr><td class="mono">'+r.record_id+'</td><td>'+r.engine+'</td><td>'+r.rows.toLocaleString()+' rows</td><td class="dim mono">'+r.received_at.replace('T',' ').slice(0,19)+'Z</td><td class="mono dim">'+r.payload_hash.slice(0,12)+'...</td></tr>').join('')
+    const fmt=r=>{
+      const c=r.reconstruction; if(!c)return 'record stored before reconstruction shipped';
+      if(r.engine==='liability')return (c.fall_detected?('fall signature in '+c.fall_zone+' at '+String(c.fall_at).replace('T',' ').slice(11,19)):'no fall signature')+' - '+(c.notice_window_seconds!==null?('notice window '+c.notice_window_seconds+'s'):c.notice_basis);
+      if(r.engine==='property')return 'origin '+(c.origin_zone||'unidentified')+(c.unobserved_flow_minutes!==null?(' - unobserved flow '+c.unobserved_flow_minutes+' min'):'')+' - peak moisture '+c.peak_moisture_pct+'% - '+c.affected_zones.length+' zone(s) affected';
+      if(r.engine==='accident')return 'delta-v '+c.delta_v_kmh+' km/h at t='+c.event_at_s+'s - peak decel '+c.peak_decel_kmh_s+' km/h/s - '+(c.braked_before_event?('braked from t='+c.brake_onset_s+'s'):'no pre-event braking');
+      return '';
+    };
+    t.innerHTML=recs.j.records.map(r=>'<tr><td class="mono">'+r.record_id+'</td><td>'+r.engine+'</td><td>'+r.rows.toLocaleString()+' rows</td><td class="dim mono">'+r.received_at.replace('T',' ').slice(0,19)+'Z</td><td class="mono dim">'+r.payload_hash.slice(0,12)+'...</td></tr><tr><td colspan="5" class="dim" style="border-top:none;padding-top:0;font-size:12px">'+fmt(r)+'</td></tr>').join('')
       ||'<tr><td class="dim">No records yet - post one with upload.mjs or the demo page.</td></tr>';
     document.getElementById('recCard').style.display='block';
   }catch(e){note.textContent='service unreachable';}
