@@ -37,7 +37,7 @@ if (/\.(jsonl|ndjson|json)$/i.test(file)) {
 if (!rows.length) { console.error('no valid ' + engine + ' rows found in ' + file); process.exit(1); }
 console.error(file + ': ' + rows.length + ' ' + engine + ' rows parsed');
 const base = endpoint.replace(/\/+$/, '');
-const CHUNK = 500;
+const CHUNK = 5000;
 for (let i = 0; i < rows.length; i += CHUNK) {
   const part = rows.slice(i, i + CHUNK);
   const r = await fetch(base + '/v1/ingest', {method: 'POST',
