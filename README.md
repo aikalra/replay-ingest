@@ -47,6 +47,9 @@ show, but server-side where a buyer's auditor can run it.
 
 **Rate limiting.** 60 requests/minute per site key, sliding window, in memory.
 
+**CORS.** Responses carry `Access-Control-Allow-Origin: *` so the browser engines can post
+directly from their pages. Open in this reference; pin it to the engine origins in production.
+
 **What this service never sees.** Video, images, PII beyond what a telemetry row carries.
 The engines reconstruct from metadata; that stays true here.
 
