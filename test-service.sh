@@ -40,4 +40,6 @@ printf 'name,color\nalice,blue\n' > $DATA_DIR/not-telemetry.csv
 echo "uploader rejects non-telemetry: $(node upload.mjs property $DATA_DIR/not-telemetry.csv $B $KP 2>&1 | head -1)"
 node -e "const rows=[];for(let i=0;i<200000;i++)rows.push({ts:'21:00',entity:'P-'+i,zone:'aisle-4'});process.stdout.write(JSON.stringify({engine:'liability',rows}))" > $DATA_DIR/too-big.json
 echo "5MB cap: $(curl -s -o /dev/null -w '%{http_code}' -X POST $B/v1/ingest -H "Authorization: Bearer $KP" -H 'content-type: application/json' --data-binary @$DATA_DIR/too-big.json) (expect 413)"
+RC=$(ls $DATA_DIR/records/*.json | head -1); echo "corrupt" > $RC
+echo "corrupt record tolerated: $(curl -s "$B/v1/records" -H "Authorization: Bearer $KP" | python3 -c "import sys,json;d=json.load(sys.stdin);print('total',d['total'],'unreadable',d['unreadable'])") , health $(curl -s $B/v1/health | python3 -c "import sys,json;print(json.load(sys.stdin)['ok'])")"
 kill $SRV
