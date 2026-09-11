@@ -8,10 +8,17 @@ let rows = [];
 if (engine === 'liability') {
   const zones = ['entrance','aisle-1','aisle-4','bar','checkout'];
   const ents = ['P-101','P-114','P-207','S-01','S-02'];
+  const subj = 'P-114', fallAt = Math.floor(n*0.6), hazAt = Math.floor(n*0.4);
   const t0 = Date.now() - n*5000;
   for (let i=0;i<n;i++) {
-    const e = {ts: new Date(t0+i*5000).toISOString(), entity: pick(ents), zone: pick(zones)};
-    if (i === Math.floor(n*0.4)) { e.type='hazard'; e.zone='aisle-4'; }
+    const isSubj = rnd() < 0.45;
+    const e = {ts: new Date(t0+i*5000).toISOString(),
+      entity: isSubj ? subj : pick(ents.filter(x=>x!==subj)),
+      zone: isSubj && i > n*0.25 ? zones[1+Math.floor((i/n)*2.9)%3] : pick(zones),
+      vel: +(0.8+rnd()*0.8).toFixed(2)};
+    if (isSubj && i >= fallAt) e.vel = +(0.02+rnd()*0.08).toFixed(2);   // sudden-stop fall signature
+    if (isSubj && i >= fallAt-1 && i < fallAt+2) e.zone = 'aisle-4';
+    if (i === hazAt) { e.type='hazard'; e.zone='aisle-4'; e.entity='S-01'; e.vel=0; }
     rows.push(e);
   }
 } else if (engine === 'property') {
