@@ -38,4 +38,6 @@ printf 'time,speed,brake\n0.0,61.2,0\n0.1,59.0,42\n0.2,55.1,88\n0.3,44.0,100\n0.
 echo "uploader CLI: $(node upload.mjs accident $DATA_DIR/upl-test.csv $B $KA 2>/dev/null | head -1)"
 printf 'name,color\nalice,blue\n' > $DATA_DIR/not-telemetry.csv
 echo "uploader rejects non-telemetry: $(node upload.mjs property $DATA_DIR/not-telemetry.csv $B $KP 2>&1 | head -1)"
+node -e "const rows=[];for(let i=0;i<200000;i++)rows.push({ts:'21:00',entity:'P-'+i,zone:'aisle-4'});process.stdout.write(JSON.stringify({engine:'liability',rows}))" > $DATA_DIR/too-big.json
+echo "5MB cap: $(curl -s -o /dev/null -w '%{http_code}' -X POST $B/v1/ingest -H "Authorization: Bearer $KP" -H 'content-type: application/json' --data-binary @$DATA_DIR/too-big.json) (expect 413)"
 kill $SRV
