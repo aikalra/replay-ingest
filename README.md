@@ -47,6 +47,10 @@ broken entry. Editing or deleting any historical entry - including its metadata 
 breaks every subsequent link. This mirrors the hash-chained ledger the browser demos
 show, but server-side where a buyer's auditor can run it.
 
+**Buyer dashboard.** `GET /dashboard` serves a zero-dependency page where a site pastes
+its key and sees its records, ledger entry count, and live audit-chain status
+(INTACT / BROKEN at entry N). The key stays in the buyer's browser (localStorage).
+
 **Listing.** `GET /v1/records?limit=&offset=` returns the calling site's record headers,
 newest first, capped at 100 per call. A site never sees another site's records.
 
