@@ -37,6 +37,21 @@ failing twice), and staged-event indicators (repeated low-delta-v events with no
 pre-impact braking). 22 checks assert each planted pattern surfaces and each one-off
 stays unflagged; the audit chain stays intact across the full 12-ingest history.
 
+## Step 0d - show the week-4 scorecard
+
+After the longitudinal rehearsal (or during a real pilot, any week):
+
+```bash
+node scorecard.mjs <site-key> --review-hours 14 --cycle-days 30
+```
+
+One command reads the tenant's stored records and prints the pilot scorecard: every
+record with its event date and computed summary, the longitudinal patterns surfaced
+(repeat claimant, repeat origin, staged-event indicator), audit-chain status, and the
+time economics - review hours and cycle days rolled up against the buyer's own
+baselines (editable assumptions, deltas labeled with direction, no savings claims).
+This is the renewal conversation in one screen.
+
 ## Step 1 - host the service (30 minutes, ~$5/mo)
 
 Any single-container host works - a small VPS, Fly.io, Railway:
