@@ -33,11 +33,12 @@ contract (the same CSV/JSONL the demos accept) and posts it - one call per incid
 one batch per day:
 
 ```bash
-curl -X POST https://<host>/v1/ingest \
-  -H "Authorization: Bearer rk_<site>_<key>" \
-  -H 'content-type: application/json' \
-  -d @week1.json
+node upload.mjs <engine> week1.csv https://<host> rk_<site>_<key>
 ```
+
+The uploader accepts the same CSV/JSONL the demos accept and chunks large files; no JSON
+hand-editing. A buyer can dry-run the contract first with synthetic data:
+`node generate.mjs <engine> 500 > sample.json`, then post it the same way.
 
 Every accepted payload lands in the hash-chained ledger. The buyer can verify the chain
 at any time with `GET /v1/audit/verify` - no trust in us required.
