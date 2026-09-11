@@ -40,6 +40,14 @@ partial is stored.
 receive time, row count, SHA-256 of the exact payload bytes. Records are addressable at
 `GET /v1/records/<id>` and readable only by the owning site's key.
 
+**Server-side reconstruction.** Every accepted payload is summarized at ingest by
+`reconstruct.mjs` - the same detection logic the browser engines run, ported to node:
+liability (tracked entity, fall signature, hazard/notice window with an honest
+no-hazard path), property (origin zone, failure and shutoff times, unobserved-flow
+minutes, affected zones), accident (peak-deceleration event across its full span,
+delta-v, brake onset). The summary lands in the stored record and the ingest response;
+an ingested week of telemetry is a computed record set, not a raw pile.
+
 **Tamper-evident audit ledger.** Every ingest appends one line to `data/ledger.jsonl`.
 Each entry chains: `chain_hash = sha256(prev_chain_hash + {seq, ts, site, engine,
 record_hash})`. `GET /v1/audit/verify` recomputes the whole chain and reports the first
