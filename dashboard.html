@@ -26,6 +26,10 @@ td{padding:9px 6px;border-top:1px solid var(--line);vertical-align:top}
   <div class="stat"><div class="n mono" id="nAudit" style="font-size:18px;padding-top:6px">-</div><div class="l">audit ledger entries</div></div>
   <div class="stat"><div class="n" id="nChain">-</div><div class="l">audit chain</div></div>
 </div>
+<div class="card" id="patCard" style="display:none">
+  <div class="mono dim" style="font-size:12px;margin-bottom:8px">LONGITUDINAL PATTERNS - derived from the records above</div>
+  <div id="pats" style="font-size:13px"></div>
+</div>
 <div class="card" id="recCard" style="display:none"><table id="recs"></table></div>
 <script>
 const keyEl=document.getElementById('key'),note=document.getElementById('note');
@@ -59,6 +63,27 @@ async function load(){
     t.innerHTML=recs.j.records.map(r=>'<tr><td class="mono">'+r.record_id+'</td><td>'+r.engine+'</td><td>'+r.rows.toLocaleString()+' rows</td><td class="dim mono">'+r.received_at.replace('T',' ').slice(0,19)+'Z</td><td class="mono dim">'+r.payload_hash.slice(0,12)+'...</td></tr><tr><td colspan="5" class="dim" style="border-top:none;padding-top:0;font-size:12px">'+fmt(r)+'</td></tr>').join('')
       ||'<tr><td class="dim">No records yet - post one with upload.mjs or the demo page.</td></tr>';
     document.getElementById('recCard').style.display='block';
+    const WEEK=7*86400000, recArr=recs.j.records, eng=recArr[0]&&recArr[0].engine, flags=[];
+    if(recArr.length>=2){
+      if(eng==='liability'){
+        const by={}; recArr.forEach(r=>{const c=r.reconstruction; if(c&&c.fall_detected)(by[c.tracked_entity]=by[c.tracked_entity]||[]).push(c.fall_at);});
+        for(const e in by){const ts=by[e].map(x=>new Date(x).getTime()).sort((a,b)=>a-b);
+          if(ts.length>1&&ts[ts.length-1]-ts[0]>=WEEK)flags.push('REPEAT CLAIMANT: '+e+' fell '+ts.length+'x over '+Math.round((ts[ts.length-1]-ts[0])/WEEK)+' weeks');}
+      } else if(eng==='property'){
+        const by={}; recArr.forEach(r=>{const c=r.reconstruction; if(c&&c.origin_zone)(by[c.origin_zone]=by[c.origin_zone]||[]).push(c.failure_at);});
+        for(const z in by){const ts=by[z].map(x=>new Date(x).getTime()).sort((a,b)=>a-b);
+          if(ts.length>1&&ts[ts.length-1]-ts[0]>=WEEK)flags.push('REPEAT LOSS, SAME ORIGIN: '+z+' failed '+ts.length+'x over '+Math.round((ts[ts.length-1]-ts[0])/WEEK)+' weeks');}
+      } else if(eng==='accident'){
+        const nb=recArr.filter(r=>r.reconstruction&&r.reconstruction.braked_before_event===false).length;
+        if(nb>=2)flags.push('STAGED-EVENT INDICATOR: '+nb+' of '+recArr.length+' events with no pre-impact braking');
+      }
+    }
+    if(recArr.length>=2){
+      document.getElementById('patCard').style.display='block';
+      document.getElementById('pats').innerHTML=flags.length
+        ? flags.map(f=>'<div class="warn" style="padding:4px 0">! '+f+'</div>').join('')
+        : '<div class="dim">none - no repeat patterns in this history</div>';
+    }
   }catch(e){note.textContent='service unreachable';}
 }
 keyEl.onchange=load; if(keyEl.value)load();
