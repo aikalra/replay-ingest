@@ -40,8 +40,10 @@ The uploader accepts the same CSV/JSONL the demos accept and chunks large files;
 hand-editing. A buyer can dry-run the contract first with synthetic data:
 `node generate.mjs <engine> 500 > sample.json`, then post it the same way.
 
-Every accepted payload lands in the hash-chained ledger. The buyer can verify the chain
-at any time with `GET /v1/audit/verify` - no trust in us required.
+Every accepted payload lands in the hash-chained ledger. The buyer watches it land at
+`https://<host>/dashboard` (paste the site key: records, ledger entries, chain status) and
+can verify the chain independently any time with `GET /v1/audit/verify` - no trust in us
+required.
 
 ## Step 3 - reconstruction on real data (the demos already do this)
 
