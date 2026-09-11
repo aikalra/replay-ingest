@@ -95,4 +95,6 @@ curl -X POST http://127.0.0.1:8790/v1/ingest \
 
 # or post a raw telemetry file directly - the same CSV/JSONL the browser demos accept:
 node upload.mjs accident week1.csv https://<host> rk_<site>_<key>
+# one incident trace = one post (files over 5,000 rows are chunked, and each chunk is
+# reconstructed separately - keep a single incident inside one file)
 ```
