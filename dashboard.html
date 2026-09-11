@@ -1,0 +1,58 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Replay pilot - records</title>
+<style>
+:root{--bg:#0b0e14;--card:#12161f;--line:#232a38;--txt:#e6eaf2;--dim:#8b94a7;--acc:#4da3ff;--ok:#3ecf8e;--warn:#ffb454;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--txt);font-family:ui-sans-serif,system-ui,sans-serif;padding:32px 20px}
+main{max-width:960px;margin:0 auto}
+h1{font-size:20px;margin-bottom:4px}
+.sub{color:var(--dim);font-size:13px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+input{background:var(--bg);color:var(--fg,#e6eaf2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:12.5px;min-width:280px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td{padding:9px 6px;border-top:1px solid var(--line);vertical-align:top}
+.mono{font-family:var(--mono);font-size:12px}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.dim{color:var(--dim)}
+.stat{display:inline-block;margin-right:28px}.stat .n{font-size:26px;font-weight:700}.stat .l{color:var(--dim);font-size:11.5px}
+</style></head><body><main>
+<h1>Replay pilot - site records</h1>
+<p class="sub">Records your site has ingested, and the audit chain that proves none of them were rewritten. Enter your site key - it stays in this browser.</p>
+<div class="card">
+  <input id="key" type="password" placeholder="rk_site_key">
+  <span class="mono dim" id="note" style="margin-left:10px"></span>
+</div>
+<div class="card" id="auditCard" style="display:none">
+  <div class="stat"><div class="n" id="nRec">0</div><div class="l">records ingested</div></div>
+  <div class="stat"><div class="n mono" id="nAudit" style="font-size:18px;padding-top:6px">-</div><div class="l">audit ledger entries</div></div>
+  <div class="stat"><div class="n" id="nChain">-</div><div class="l">audit chain</div></div>
+</div>
+<div class="card" id="recCard" style="display:none"><table id="recs"></table></div>
+<script>
+const keyEl=document.getElementById('key'),note=document.getElementById('note');
+try{keyEl.value=localStorage.getItem('ri_dash_key')||'';}catch(e){}
+async function load(){
+  const k=keyEl.value.trim(); if(!k)return;
+  try{localStorage.setItem('ri_dash_key',k);}catch(e){}
+  note.textContent='loading...';
+  const h={authorization:'Bearer '+k};
+  try{
+    const [recs,audit]=await Promise.all([
+      fetch('/v1/records?limit=100',{headers:h}).then(r=>r.json().then(j=>({s:r.status,j}))),
+      fetch('/v1/audit/verify').then(r=>r.json())]);
+    if(recs.s===401||recs.s===403){note.textContent='key not recognized - check it and retry';return;}
+    if(recs.s!==200){note.textContent='error '+recs.s;return;}
+    note.textContent='';
+    document.getElementById('auditCard').style.display='block';
+    document.getElementById('nRec').textContent=recs.j.total;
+    document.getElementById('nAudit').textContent=audit.entries;
+    const ch=document.getElementById('nChain');
+    ch.textContent=audit.ok?'INTACT':'BROKEN at entry '+audit.break_at;
+    ch.className=audit.ok?'ok':'warn';
+    const t=document.getElementById('recs');
+    t.innerHTML=recs.j.records.map(r=>'<tr><td class="mono">'+r.record_id+'</td><td>'+r.engine+'</td><td>'+r.rows.toLocaleString()+' rows</td><td class="dim mono">'+r.received_at.replace('T',' ').slice(0,19)+'Z</td><td class="mono dim">'+r.payload_hash.slice(0,12)+'...</td></tr>').join('')
+      ||'<tr><td class="dim">No records yet - post one with upload.mjs or the demo page.</td></tr>';
+    document.getElementById('recCard').style.display='block';
+  }catch(e){note.textContent='service unreachable';}
+}
+keyEl.onchange=load; if(keyEl.value)load();
+</script></main></body></html>
