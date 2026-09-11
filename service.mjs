@@ -44,6 +44,11 @@ const server = http.createServer((req, res) => {
 
   if (url.pathname === '/v1/health') return send(200, {ok: true, service: 'replay-ingest', version: '0.1.0'});
 
+  if (url.pathname === '/dashboard' && req.method === 'GET') {
+    res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
+    return res.end(fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), 'dashboard.html')));
+  }
+
   if (url.pathname === '/v1/audit/verify' && req.method === 'GET') {
     let prev = GENESIS, n = 0, ok = true, badAt = null;
     for (const line of fs.readFileSync(LEDGER, 'utf8').trim().split('\n').filter(Boolean)) {
