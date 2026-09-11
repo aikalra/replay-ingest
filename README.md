@@ -20,6 +20,11 @@ shown once at issuance (`make-key.mjs`). Keys are scoped to exactly one engine
 `/v1/audit/verify` require `Authorization: Bearer <key>` over TLS (terminate TLS at the
 host or proxy). Wrong engine for the key: 403. Unknown key: 403. Missing key: 401.
 
+**Key lifecycle.** A site rotates its own key without us: `POST /v1/keys/rotate` with the
+current key returns the replacement once and retires the old hash immediately.
+`POST /v1/keys/revoke` kills a key with no replacement. A lost or leaked key is a
+60-second fix for the buyer, not a support ticket.
+
 **Ingest contract.** `POST /v1/ingest` with `{"engine": "<engine>", "rows": [...]}`.
 Rows are validated against the engine's contract - the same contracts the browser
 demos accept:
@@ -66,5 +71,10 @@ reverse proxy. None of that changes the API or the contracts.
 ```bash
 node make-key.mjs demo-mart liability     # prints the key once
 node service.mjs                          # listens on :8790 (PORT to override)
-./test-service.sh                         # full auth/schema/chain/tamper test
+./test-service.sh                         # auth, schema, chain, tamper, rotation, revocation
+
+# self-test the contract before sending real data:
+node generate.mjs property 500 7 > sample.json   # valid synthetic payload, seeded
+curl -X POST http://127.0.0.1:8790/v1/ingest \
+  -H "Authorization: Bearer rk_..." -H 'content-type: application/json' -d @sample.json
 ```
