@@ -1,6 +1,7 @@
 // replay-ingest: authenticated ingest + hash-chained record store (reference implementation)
 // Node 18+, zero dependencies. Data lives under DATA_DIR (default ./data).
 import http from 'node:http';
+import { summarize } from './reconstruct.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -102,6 +103,7 @@ const server = http.createServer((req, res) => {
         site: key.site, engine: key.engine,
         received_at: new Date().toISOString(),
         rows: rows.length, payload_hash: sha(body),
+        reconstruction: summarize(key.engine, rows),
       };
       const dup = fs.existsSync(path.join(RECDIR, record.record_id + '.json'));
       const prev = lastChain();
