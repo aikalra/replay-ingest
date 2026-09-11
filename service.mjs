@@ -63,6 +63,23 @@ const server = http.createServer((req, res) => {
   if (!key) return send(403, {error: 'unknown site key'});
   if (!rateOk(kh)) return send(429, {error: 'rate limit: 60 requests/minute per site key'});
 
+  if (url.pathname === '/v1/keys/rotate' && req.method === 'POST') {
+    // rotate: the current key authorizes its own replacement; the new key is returned once
+    const keys = loadKeys();
+    const next = 'rk_' + key.site.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '_' + crypto.randomBytes(16).toString('hex');
+    delete keys[kh];
+    keys[sha(next)] = {site: key.site, engine: key.engine, created: new Date().toISOString(), rotated_from: kh.slice(0, 12)};
+    fs.writeFileSync(KEYS, JSON.stringify(keys, null, 2));
+    return send(200, {rotated: true, site: key.site, engine: key.engine, new_key: next});
+  }
+
+  if (url.pathname === '/v1/keys/revoke' && req.method === 'POST') {
+    const keys = loadKeys();
+    delete keys[kh];
+    fs.writeFileSync(KEYS, JSON.stringify(keys, null, 2));
+    return send(200, {revoked: true, site: key.site, engine: key.engine});
+  }
+
   if (url.pathname === '/v1/ingest' && req.method === 'POST') {
     let body = '';
     req.on('data', c => { body += c; if (body.length > 5e6) req.destroy(); });
