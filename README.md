@@ -67,6 +67,14 @@ newest first, capped at 100 per call. A site never sees another site's records.
 
 **Rate limiting.** 60 requests/minute per site key, sliding window, in memory.
 
+**Limits and failure behavior.** Payloads over 5MB are rejected with 413 before the body
+is read. A record file that is unreadable on disk never takes the service down: listings
+skip it and report an `unreadable` count, and fetching it directly returns 422. If the
+audit ledger itself is corrupted, `/v1/audit/verify` flags the break at the exact entry
+(including lines that no longer parse) while the service keeps running; ingest refuses to
+append onto a corrupt tip with a 500 until the ledger is repaired, so a broken chain is
+never silently extended.
+
 **CORS.** Responses carry `Access-Control-Allow-Origin: *` so the browser engines can post
 directly from their pages. Open in this reference; pin it to the engine origins in production.
 
