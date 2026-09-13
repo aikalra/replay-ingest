@@ -52,22 +52,17 @@ time economics - review hours and cycle days rolled up against the buyer's own
 baselines (editable assumptions, deltas labeled with direction, no savings claims).
 This is the renewal conversation in one screen.
 
-## Step 1 - host the service (30 minutes, ~$5/mo)
+## Step 1 - the buyer hosts it (10 minutes, $0)
 
-Any single-container host works - a small VPS, Fly.io, Railway:
+The default pilot shape is partner-hosted: the service runs on the buyer's own
+infrastructure, so their telemetry never leaves their environment - the privacy
+architecture demonstrated by the pilot itself, not just described. The one-page
+quickstart their technical contact follows is **[PILOT-QUICKSTART.md](PILOT-QUICKSTART.md)**:
+`docker compose up -d --build`, one `make-key.mjs` call, a synthetic dry-run, then
+real uploads.
 
-```bash
-docker build -t replay-ingest .
-docker run -d -p 443:8790 -v replay-data:/data replay-ingest
-```
-
-Terminate TLS (Caddy or the host's built-in). Issue the buyer's site key:
-
-```bash
-docker exec <container> node make-key.mjs <buyer-site> <engine>
-```
-
-Send the key to the buyer's technical contact once, over a channel both sides already use.
+Self-hosted-by-us (~$5/mo VPS) remains the fallback for a buyer who cannot run a
+container; it is no longer the default and needs no decision now.
 
 ## Step 2 - replay one real week (buyer effort: one export)
 
@@ -109,7 +104,5 @@ front:
 
 ## What still blocks the paid pilot (be honest about it)
 
-- This service deployed on a host we operate (Step 1 - needs a go decision, it is a
-  real running cost and a public endpoint)
 - A buyer name and one site (Step 0 - Aashish's call with John or Rohan)
 - Multi-tenant isolation beyond per-site keys if a second buyer joins (a day of work)
