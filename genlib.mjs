@@ -44,6 +44,20 @@ export function genRows(engine, opts = {}) {
     let v = 55+rnd()*15;
     const brakeAt = Math.floor(n*0.6);
     const noBrake = !!opts.noBrake;
+    if (opts.weak) {
+      // weak-signal mode: sparse, gappy OBD export (low-frequency logger dropping
+      // samples) - exercises the ingest service's degraded/insufficient grading.
+      const m = Math.max(3, Math.floor(n / 12));
+      let t = 0;
+      for (let i = 0; i < m; i++) {
+        const braking = i >= Math.floor(m * 0.6);
+        const dec = braking ? 0.5 + rnd() * 0.4 : rnd() * 0.3;
+        v = Math.max(0, v - dec);
+        rows.push({time: +t.toFixed(2), speed: +v.toFixed(1), brake: braking ? 60 : 0});
+        t += 0.4 + rnd() * 1.6; // irregular gaps up to ~2s
+      }
+      return rows;
+    }
     for (let i=0;i<n;i++) {
       const brake = noBrake ? 0 : (i<brakeAt ? 0 : Math.min(100, (i-brakeAt)*30));
       const dec = i<brakeAt ? rnd()*0.3 : (noBrake ? 0.4+rnd()*0.3 : (1.2+rnd()*0.8) * (0.3 + brake/100));
