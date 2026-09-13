@@ -93,16 +93,21 @@ if (cmd === 'init') {
         if (rnd() >= sub.weekly_risk) continue;
         attempts++;
         const covered = rnd() < org.coverage;
-        if (!covered) {
+        if (!covered && org.engine !== 'accident') {
+          // no-telemetry stays a real bounce class for premises (property/stores
+          // legitimately have unsensored areas); it is NOT one for auto.
           const why = 'no-telemetry';
           bounces[why] = (bounces[why] || 0) + 1;
           lines.push(JSON.stringify({week, site: org.site, engine: org.engine, subject: sub.id, outcome: 'bounce', why}));
           continue;
         }
-        // data quality: even covered incidents can come through partial (truncated trace)
-        const quality = rnd() < 0.9 ? 'full' : 'partial';
+        // OBD correction: every car has telemetry. An "uncovered" auto incident is a
+        // WEAK export (aftermarket logger, dropped samples), not a missing one - the
+        // service grades it; only a truly insufficient export bounces (as no-signal).
+        const quality = !covered ? 'weak' : (rnd() < 0.9 ? 'full' : 'partial');
         const rows = genRows(org.engine, {
-          rows: quality === 'full' ? 160 : 12, seed: seedBase++,
+          rows: quality === 'full' ? 160 : quality === 'partial' ? 12 : 30 + Math.floor(rnd() * 100),
+          weak: quality === 'weak' || undefined, seed: seedBase++,
           daysAgo: ((pop.tick || 0) + weeks - 1 - week) * 7 + Math.floor(rnd() * 7), // backdate the event into its simulated week
           subject: org.engine === 'liability' ? sub.id : undefined,
           origin: org.engine === 'property' ? sub.id : undefined,
@@ -128,7 +133,8 @@ if (cmd === 'init') {
         else { const why = 'no-signal'; bounces[why] = (bounces[why] || 0) + 1; }
         lines.push(JSON.stringify({week, site: org.site, engine: org.engine, subject: sub.id,
           outcome: answered ? 'used' : 'bounce', why: answered ? undefined : 'no-signal',
-          quality, record: j.record_id, dup: j.duplicate || undefined}));
+          quality: s.data_quality ? quality + ':' + s.data_quality : quality,
+          record: j.record_id, dup: j.duplicate || undefined}));
       }
     }
     fs.appendFileSync(USAGE, lines.join('\n') + (lines.length ? '\n' : ''));
