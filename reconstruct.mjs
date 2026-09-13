@@ -74,8 +74,29 @@ function property(rows) {
   let shutT = null;
   if (failT) for (let t = failT; t <= t1; t += step) { const w = wetAt(t); if (flowAt(t) < 1 && Object.values(w).some(m => m > mm * 0.05)) { shutT = t; break; } }
   const affected = zones.filter(zn => (peak[zn] || 0) > mm * 0.05);
+  // data quality + coverage: property/stores legitimately have availability gaps
+  // (a store zone or building area without sensors produces no stream), so grade
+  // what arrived and bound the reconstruction to observed zones, honestly.
+  let maxGapMs = 0;
+  for (let i = 1; i < tms.length; i++) { const g = tms[i] - tms[i-1]; if (g > maxGapMs) maxGapMs = g; }
+  const spanMin = (t1 - t0) / 60000;
+  const perMin = rows.length / Math.max(1, spanMin);
+  let quality, qbasis;
+  if (rows.length < 5 || spanMin < 2) {
+    quality = 'insufficient';
+    qbasis = 'too few readings to bound the loss window - pull the full sensor export for this site';
+  } else if (rows.length < 20 || maxGapMs > Math.max(300000, (t1 - t0) / 4)) {
+    quality = 'degraded';
+    qbasis = 'sparse or gappy readings - origin and timing are bounds, not exact values';
+  } else {
+    quality = 'high';
+    qbasis = 'regular readings across the loss window';
+  }
   return {
     readings: rows.length, zones: zones.length,
+    data_quality: quality, data_quality_basis: qbasis,
+    coverage: 'bounded to ' + zones.length + ' zone(s) with sensor readings: ' + zones.join(', ')
+      + ' - areas without sensors produce no stream and are not establishable from this file',
     origin_zone: origin, failure_at: failT ? new Date(failT).toISOString() : null,
     shutoff_at: shutT ? new Date(shutT).toISOString() : null,
     unobserved_flow_minutes: (failT && shutT) ? Math.round((shutT - failT) / 60000) : null,
