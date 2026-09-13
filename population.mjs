@@ -59,7 +59,7 @@ if (cmd === 'init') {
     // subject populations with heterogeneous risk: most low, a few high (repeat claimants emerge)
     const nSubj = engine === 'liability' ? 20 + Math.floor(rnd() * 30)
                 : engine === 'accident' ? 10 + Math.floor(rnd() * 40)
-                : 3 + Math.floor(rnd() * 4); // zones per property
+                : 5 + Math.floor(rnd() * 6); // zones per property (weighted up: real residences sensor more zones over time)
     const subjects = [];
     for (let s = 0; s < nSubj; s++) {
       const highRisk = rnd() < 0.06; // ~6% of subjects carry ~40% of incidents
@@ -89,6 +89,12 @@ if (cmd === 'init') {
     let attempts = 0, used = 0, bounces = {};
     const lines = [];
     for (const org of pop.orgs) {
+      // property sensor retrofits: ~3% of residence orgs add a zone each week
+      if (org.engine === 'property' && rnd() < 0.03) {
+        const s = org.subjects.length;
+        org.subjects.push({id: ['crawl','kitchen','bath','attic','basement'][s % 5],
+          weekly_risk: 0.002 + rnd() * 0.008});
+      }
       for (const sub of org.subjects) {
         if (rnd() >= sub.weekly_risk) continue;
         attempts++;
