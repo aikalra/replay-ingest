@@ -9,7 +9,10 @@ if (!['liability','property','accident'].includes(engine) || !file || !endpoint 
 }
 const txt = fs.readFileSync(file, 'utf8');
 let rows = [];
-if (/\.(jsonl|ndjson|json)$/i.test(file)) {
+// also accept the generate.mjs envelope ({"engine": ..., "rows": [...]}) so the
+// quickstart's step-3 sample works as a step-4 input
+try { const env = JSON.parse(txt); if (env && Array.isArray(env.rows)) rows = env.rows; } catch {}
+if (!rows.length && /\.(jsonl|ndjson|json)$/i.test(file)) {
   for (const l of txt.split('\n')) {
     const t = l.trim(); if (!t || t[0] !== '{') continue;
     try {
