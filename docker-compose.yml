@@ -1,0 +1,10 @@
+services:
+  replay-ingest:
+    build: .
+    ports:
+      - "8790:8790"
+    volumes:
+      - replay-data:/data
+    restart: unless-stopped
+volumes:
+  replay-data:
