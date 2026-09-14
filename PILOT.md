@@ -105,4 +105,7 @@ front:
 ## What still blocks the paid pilot (be honest about it)
 
 - A buyer name and one site (Step 0 - Aashish's call with John or Rohan)
-- Multi-tenant isolation beyond per-site keys if a second buyer joins (a day of work)
+
+Multi-tenant isolation is done: keys carry an org (defaults to the site), records are
+org-scoped, any key in the org reads the org's records via `GET /v1/org/records`, and
+cross-tenant reads get 403. A second buyer joins with `node make-key.mjs <site> <engine> <org>`.
