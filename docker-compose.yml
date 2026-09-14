@@ -2,7 +2,7 @@ services:
   replay-ingest:
     build: .
     ports:
-      - "8790:8790"
+      - "127.0.0.1:8790:8790"
     volumes:
       - replay-data:/data
     restart: unless-stopped
