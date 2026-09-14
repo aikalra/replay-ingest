@@ -113,7 +113,10 @@ if (cmd === 'init') {
   const rnd = mulberry32(20260911 + pop.orgs.length);
   const counts = {liability: 0, accident: 0, property: 0};
   pop.orgs.forEach(o => counts[o.engine]++);
-  const engines = ['liability', 'accident', 'property'];
+  const engines = ['liability', 'accident
+                   
+                   }
+
   const startTotal = pop.orgs.length;
   for (let i = 0; i < add; i++) {
     const engine = engines[(startTotal + i) % 3];
