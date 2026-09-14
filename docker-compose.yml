@@ -8,3 +8,4 @@ services:
     restart: unless-stopped
 volumes:
   replay-data:
+    name: replay-data
