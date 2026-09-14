@@ -44,8 +44,7 @@ host or proxy). Wrong engine for the key: 403. Unknown key: 403. Missing key: 40
 
 **Key lifecycle.** A site rotates its own key without us: `POST /v1/keys/rotate` with the
 current key returns the replacement once and retires the old hash immediately.
-`POST /v1/keys/revoke` kills a key with no replacement. A lost or leaked key is a
-60-second fix for the buyer, not a support ticket.
+`POST /v1/keys/revoke` kills a key with no replacement. A controlled site can rotate or revoke a lost or leaked key without vendor access.
 
 **Ingest contract.** `POST /v1/ingest` with `{"engine": "<engine>", "rows": [...]}`.
 Rows are validated against the engine's contract - the same contracts the browser
