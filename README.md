@@ -11,6 +11,28 @@ signed reconstruction record in-page. A commercial pilot needs the missing serve
 a place where a site's data actually lands, under a key the buyer controls, into a store
 whose history cannot be quietly rewritten. This is that half.
 
+## Commercial path - start here
+
+The product and buyer work are separated so each reviewer can open only what they
+need. No page below supplies a buyer, price, approval, or production claim.
+
+1. [PILOT-INTRO.md](PILOT-INTRO.md) - forwardable one-page pilot note.
+2. [PILOT-QUICKSTART.md](PILOT-QUICKSTART.md) - buyer-hosted setup and first
+   synthetic record.
+3. [PILOT-WEEK1.md](PILOT-WEEK1.md) - day 0 through the first weekly check-in.
+4. [SECURITY-FAQ.md](SECURITY-FAQ.md) - verifiable answers for IT/security review.
+5. [PILOT-CLOSEOUT.md](PILOT-CLOSEOUT.md) - site/org evidence and the
+   proceed/extend/stop decision.
+6. [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md) - owner/evidence gates
+   between the pilot and a controlled rollout.
+7. [PAID-SHAPE.md](PAID-SHAPE.md) and [ORDER-FORM.md](ORDER-FORM.md) - measured
+   unit shapes and blank commercial terms; neither is an offer.
+8. [SUPPORT-RUNBOOK.md](SUPPORT-RUNBOOK.md) - evidence-first paid-tier intake,
+   containment, routing, recovery, and closeout.
+
+Executable operator path: [PILOT.md](PILOT.md). The code and tests below remain
+the source for what the service actually does.
+
 ## Design
 
 **Authentication.** Every site gets a key at onboarding: `rk_<site>_<32 hex>`.
