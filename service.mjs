@@ -75,7 +75,7 @@ const server = http.createServer((req, res) => {
     const keys = loadKeys();
     const next = 'rk_' + key.site.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '_' + crypto.randomBytes(16).toString('hex');
     delete keys[kh];
-    keys[sha(next)] = {site: key.site, engine: key.engine, created: new Date().toISOString(), rotated_from: kh.slice(0, 12)};
+    keys[sha(next)] = {site: key.site, engine: key.engine, org: key.org || key.site, created: new Date().toISOString(), rotated_from: kh.slice(0, 12)};
     fs.writeFileSync(KEYS, JSON.stringify(keys, null, 2));
     return send(200, {rotated: true, site: key.site, engine: key.engine, new_key: next});
   }
@@ -103,7 +103,7 @@ const server = http.createServer((req, res) => {
       if (bad >= 0) return send(422, {error: 'row ' + bad + ' fails the ' + key.engine + ' ingest contract'});
       const record = {
         record_id: 'REC-' + sha(kh + body).slice(0, 12),
-        site: key.site, engine: key.engine,
+        site: key.site, engine: key.engine, org: key.org || key.site,
         received_at: new Date().toISOString(),
         rows: rows.length, payload_hash: sha(body),
         reconstruction: summarize(key.engine, rows),
@@ -137,12 +137,26 @@ const server = http.createServer((req, res) => {
     return send(200, {site: key.site, total: all.length, unreadable, offset, records: all.slice(offset, offset + limit)});
   }
 
+  if (url.pathname === '/v1/org/records' && req.method === 'GET') {
+    const org = key.org || key.site;
+    const limit = Math.min(100, +(url.searchParams.get('limit') || 50));
+    const offset = Math.max(0, +(url.searchParams.get('offset') || 0));
+    let unreadable = 0;
+    const loadRec = f => { try { return JSON.parse(fs.readFileSync(path.join(RECDIR, f), 'utf8')); } catch { unreadable++; return null; } };
+    const all = fs.readdirSync(RECDIR).filter(f => f.endsWith('.json'))
+      .map(loadRec).filter(Boolean)
+      .map(j => j.record)
+      .filter(r => r && (r.org || r.site) === org)
+      .sort((a, b) => b.received_at.localeCompare(a.received_at));
+    return send(200, {org, total: all.length, unreadable, offset, records: all.slice(offset, offset + limit)});
+  }
+
   const rm = /^\/v1\/records\/(REC-[0-9a-f]{12})$/.exec(url.pathname);
   if (rm && req.method === 'GET') {
     const p = path.join(RECDIR, rm[1] + '.json');
     if (!fs.existsSync(p)) return send(404, {error: 'not found'});
     let rec; try { rec = JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return send(422, {error: 'record file is unreadable on disk'}); }
-    if (rec.record.site !== key.site) return send(403, {error: 'record belongs to another site'});
+    if ((rec.record.org || rec.record.site) !== (key.org || key.site)) return send(403, {error: 'record belongs to another tenant'});
     res.writeHead(200, {'content-type': 'application/json', 'access-control-allow-origin': '*'}); return res.end(fs.readFileSync(p));
   }
   return send(404, {error: 'unknown route'});
