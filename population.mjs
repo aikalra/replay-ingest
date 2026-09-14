@@ -17,17 +17,23 @@
 import { spawn, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { genRows } from './genlib.mjs';
 
 const ECON = process.env.ECON_DIR || '/tmp/economy';
 const DATA = path.join(ECON, 'data');
 const POP = path.join(ECON, 'population.json');
 const USAGE = path.join(ECON, 'usage.jsonl');
+const TICK_LOCK = path.join(ECON, 'tick.lock');
+const TICK_TX = path.join(ECON, 'tick-transaction.json');
+const TICK_CHUNK = path.join(ECON, 'tick-transaction.jsonl');
+const POP_NEXT = path.join(ECON, 'population.next.json');
 const PORT = 8780, BASE = 'http://127.0.0.1:' + PORT;
 const cmd = process.argv[2];
 
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
 
 async function serviceUp() {
   try { const r = await fetch(BASE + '/v1/health'); return r.ok; } catch { return false; }
@@ -115,75 +121,71 @@ if (cmd === 'init') {
   if (srv) srv.kill();
 } else if (cmd === 'tick') {
   const weeks = +(process.argv[3] || 1);
-  const pop = JSON.parse(fs.readFileSync(POP, 'utf8'));
-  const srv = await ensureService();
-  let seedBase = Date.now() % 100000;
-  for (let w = 0; w < weeks; w++) {
-    const week = (pop.tick || 0) + w;
-    const rnd = mulberry32(7777 + week);
-    let attempts = 0, used = 0, bounces = {};
-    const lines = [];
-    for (const org of pop.orgs) {
-      // property sensor retrofits: ~3% of residence orgs add a zone each week
-      if (org.engine === 'property' && rnd() < 0.03) {
-        const s = org.subjects.length;
-        org.subjects.push({id: ['crawl','kitchen','bath','attic','basement'][s % 5],
-          weekly_risk: 0.002 + rnd() * 0.008});
-      }
-      for (const sub of org.subjects) {
-        if (rnd() >= sub.weekly_risk) continue;
-        attempts++;
-        const covered = rnd() < org.coverage;
-        if (!covered && org.engine !== 'accident') {
-          // no-telemetry stays a real bounce class for premises (property/stores
-          // legitimately have unsensored areas); it is NOT one for auto.
-          const why = 'no-telemetry';
-          bounces[why] = (bounces[why] || 0) + 1;
-          lines.push(JSON.stringify({week, site: org.site, engine: org.engine, subject: sub.id, outcome: 'bounce', why}));
-          continue;
-        }
-        // OBD correction: every car has telemetry. An "uncovered" auto incident is a
-        // WEAK export (aftermarket logger, dropped samples), not a missing one - the
-        // service grades it; only a truly insufficient export bounces (as no-signal).
-        const quality = !covered ? 'weak' : (rnd() < 0.9 ? 'full' : 'partial');
-        const rows = genRows(org.engine, {
-          rows: quality === 'full' ? 160 : quality === 'partial' ? 12 : 30 + Math.floor(rnd() * 100),
-          weak: quality === 'weak' || undefined, seed: seedBase++,
-          daysAgo: ((pop.tick || 0) + weeks - 1 - week) * 7 + Math.floor(rnd() * 7), // backdate the event into its simulated week
-          subject: org.engine === 'liability' ? sub.id : undefined,
-          origin: org.engine === 'property' ? sub.id : undefined,
-          noBrake: org.engine === 'accident' && rnd() < 0.15,
-          now: Date.now(),
-        });
-        const r = await fetch(BASE + '/v1/ingest', {method: 'POST',
-          headers: {authorization: 'Bearer ' + org.key, 'content-type': 'application/json'},
-          body: JSON.stringify({engine: org.engine, rows})});
-        const j = await r.json();
-        if (r.status !== 201 && r.status !== 200) {
-          const why = 'http-' + r.status;
-          bounces[why] = (bounces[why] || 0) + 1;
-          lines.push(JSON.stringify({week, site: org.site, engine: org.engine, subject: sub.id, outcome: 'bounce', why}));
-          continue;
-        }
-        // "used" = the record answers the adjuster's question: the engine found its event
-        const s = j.reconstruction || {};
-        const answered = org.engine === 'liability' ? !!s.fall_detected
-          : org.engine === 'property' ? !!s.origin_zone
-          : (s.delta_v_kmh !== null && s.delta_v_kmh !== undefined);
-        if (answered) used++;
-        else { const why = 'no-signal'; bounces[why] = (bounces[why] || 0) + 1; }
-        lines.push(JSON.stringify({week, site: org.site, engine: org.engine, subject: sub.id,
-          outcome: answered ? 'used' : 'bounce', why: answered ? undefined : 'no-signal',
-          quality: s.data_quality ? quality + ':' + s.data_quality : quality,
-          record: j.record_id, dup: j.duplicate || undefined}));
-      }
+  fs.mkdirSync(ECON, {recursive:true});
+  let lock;
+  try { lock = fs.openSync(TICK_LOCK, 'wx'); }
+  catch { console.error('another tick is active (or tick.lock is stale)'); process.exit(1); }
+  try {
+    // Recover a prepared commit. It is safe after a partial append because the
+    // journal records the exact pre-append byte offset and chunk hash.
+    if (fs.existsSync(TICK_TX)) {
+      const tx = JSON.parse(fs.readFileSync(TICK_TX));
+      const chunk = fs.readFileSync(TICK_CHUNK, 'utf8');
+      if (sha256(chunk) !== tx.chunk_sha256 || Buffer.byteLength(chunk) !== tx.chunk_bytes) throw new Error('journal chunk mismatch');
+      const size = fs.existsSync(USAGE) ? fs.statSync(USAGE).size : 0;
+      if (size < tx.usage_offset || size > tx.usage_offset + tx.chunk_bytes) throw new Error('usage outside journal boundary');
+      const tail = size > tx.usage_offset ? fs.readFileSync(USAGE).subarray(tx.usage_offset).toString() : '';
+      if (tail && !chunk.startsWith(tail)) throw new Error('partial append differs from journal');
+      if (tail.length < chunk.length) { fs.truncateSync(USAGE, tx.usage_offset); fs.appendFileSync(USAGE, chunk); }
+      const current = JSON.parse(fs.readFileSync(POP));
+      if ((current.tick || 0) <= tx.week) fs.renameSync(POP_NEXT, POP);
+      fs.rmSync(TICK_TX, {force:true}); fs.rmSync(TICK_CHUNK, {force:true}); fs.rmSync(POP_NEXT, {force:true});
+      console.log('recovered week ' + tx.week + ' from journal');
     }
-    fs.appendFileSync(USAGE, lines.join('\n') + (lines.length ? '\n' : ''));
-    console.log('week ' + week + ': ' + attempts + ' incidents, ' + used + ' used, bounces ' + JSON.stringify(bounces));
-  }
-  pop.tick = (pop.tick || 0) + weeks;
-  fs.writeFileSync(POP, JSON.stringify(pop, null, 2));
-  if (srv) srv.kill();
+    let pop = JSON.parse(fs.readFileSync(POP));
+    const srv = await ensureService();
+    for (let w = 0; w < weeks; w++) {
+      const week = pop.tick || 0;
+      const rnd = mulberry32(7777 + week);
+      let seedBase = week * 100000, attempts = 0, used = 0, bounces = {};
+      const lines = [];
+      for (const org of pop.orgs) {
+        if (org.engine === 'property' && rnd() < 0.03) {
+          const n = org.subjects.length;
+          org.subjects.push({id:['crawl','kitchen','bath','attic','basement'][n%5], weekly_risk:0.002+rnd()*0.008});
+        }
+        for (const sub of org.subjects) {
+          if (rnd() >= sub.weekly_risk) continue;
+          attempts++;
+          const covered = rnd() < org.coverage;
+          if (!covered && org.engine !== 'accident') {
+            const why='no-telemetry'; bounces[why]=(bounces[why]||0)+1;
+            lines.push(JSON.stringify({week,site:org.site,engine:org.engine,subject:sub.id,outcome:'bounce',why})); continue;
+          }
+          const quality=!covered?'weak':(rnd()<0.9?'full':'partial');
+          const rows=genRows(org.engine,{rows:quality==='full'?160:quality==='partial'?12:30+Math.floor(rnd()*100),weak:quality==='weak'||undefined,seed:seedBase++,daysAgo:0,subject:org.engine==='liability'?sub.id:undefined,origin:org.engine==='property'?sub.id:undefined,noBrake:org.engine==='accident'&&rnd()<0.15,now:Date.UTC(2025,0,1)+week*7*86400000});
+          const r=await fetch(BASE+'/v1/ingest',{method:'POST',headers:{authorization:'Bearer '+org.key,'content-type':'application/json'},body:JSON.stringify({engine:org.engine,rows})});
+          const j=await r.json();
+          if (r.status!==201 && r.status!==200) { const why='http-'+r.status; bounces[why]=(bounces[why]||0)+1; lines.push(JSON.stringify({week,site:org.site,engine:org.engine,subject:sub.id,outcome:'bounce',why})); continue; }
+          const rec=j.reconstruction||{};
+          const answered=org.engine==='liability'?!!rec.fall_detected:org.engine==='property'?!!rec.origin_zone:(rec.delta_v_kmh!==null&&rec.delta_v_kmh!==undefined);
+          if(answered) used++; else { const why='no-signal'; bounces[why]=(bounces[why]||0)+1; }
+          lines.push(JSON.stringify({week,site:org.site,engine:org.engine,subject:sub.id,outcome:answered?'used':'bounce',why:answered?undefined:'no-signal',quality:rec.data_quality?quality+':'+rec.data_quality:quality,record:j.record_id,dup:j.duplicate||undefined}));
+        }
+      }
+      const chunk=lines.join('\n')+(lines.length?'\n':'');
+      pop.tick=week+1;
+      fs.writeFileSync(POP_NEXT,JSON.stringify(pop,null,2)+'\n');
+      fs.writeFileSync(TICK_CHUNK,chunk);
+      const tx={week,usage_offset:fs.existsSync(USAGE)?fs.statSync(USAGE).size:0,chunk_bytes:Buffer.byteLength(chunk),chunk_sha256:sha256(chunk)};
+      fs.writeFileSync(TICK_TX,JSON.stringify(tx,null,2)+'\n');
+      fs.appendFileSync(USAGE,chunk);
+      fs.renameSync(POP_NEXT,POP);
+      fs.rmSync(TICK_TX); fs.rmSync(TICK_CHUNK);
+      console.log('week '+week+': '+attempts+' incidents, '+used+' used, bounces '+JSON.stringify(bounces));
+    }
+    if(srv) srv.kill();
+  } finally { if(lock!==undefined) fs.closeSync(lock); fs.rmSync(TICK_LOCK,{force:true}); }
 } else if (cmd === 'report') {
   const lines = fs.existsSync(USAGE) ? fs.readFileSync(USAGE, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : [];
   const used = lines.filter(l => l.outcome === 'used');
@@ -205,4 +207,4 @@ if (cmd === 'init') {
 } else {
   console.error('usage: node population.mjs init <orgs> | tick [weeks] | report');
   process.exit(1);
-}
+    }
