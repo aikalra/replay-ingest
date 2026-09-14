@@ -156,7 +156,7 @@ if (cmd === 'init') {
       if (size < tx.usage_offset || size > tx.usage_offset + tx.chunk_bytes) throw new Error('usage outside journal boundary');
       const tail = size > tx.usage_offset ? fs.readFileSync(USAGE).subarray(tx.usage_offset).toString() : '';
       if (tail && !chunk.startsWith(tail)) throw new Error('partial append differs from journal');
-      if (tail.length < chunk.length) { fs.truncateSync(USAGE, tx.usage_offset); fs.appendFileSync(USAGE, chunk); }
+      if (tail.length < chunk.length) { if (fs.existsSync(USAGE)) fs.truncateSync(USAGE, tx.usage_offset); else if (tx.usage_offset !== 0) throw new Error('usage log missing before non-empty offset'); fs.appendFileSync(USAGE, chunk); }
       const current = JSON.parse(fs.readFileSync(POP));
       if ((current.tick || 0) <= tx.week) fs.renameSync(POP_NEXT, POP);
       fs.rmSync(TICK_TX, {force:true}); fs.rmSync(TICK_CHUNK, {force:true}); fs.rmSync(POP_NEXT, {force:true});
@@ -227,4 +227,4 @@ if (cmd === 'init') {
 } else {
   console.error('usage: node population.mjs init <orgs> | tick [weeks] | report');
   process.exit(1);
-}
+              }
