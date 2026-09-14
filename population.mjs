@@ -8,6 +8,7 @@
 //
 //   node population.mjs init <orgs>            create the population (persists)
 //   node population.mjs tick [weeks]           simulate weeks of activity (persists)
+//   node population.mjs expand <orgs>        add orgs that join at the current tick
 //   node population.mjs report                 usage + bounce analysis
 //
 // State: ECON_DIR (default /tmp/economy): population.json, usage.jsonl, data/ (the
@@ -77,6 +78,40 @@ if (cmd === 'init') {
   fs.writeFileSync(POP, JSON.stringify({created_at: new Date().toISOString(), orgs}, null, 2));
   console.log('population: ' + orgs.length + ' orgs (' + engines.map(e => orgs.filter(o => o.engine === e).length + ' ' + e).join(', ') + ')');
   console.log('subjects: ' + orgs.reduce((a, o) => a + o.subjects.length, 0));
+  if (srv) srv.kill();
+} else if (cmd === 'expand') {
+  // grow the economy: new orgs join at the current tick, same shapes as init
+  const add = +(process.argv[3] || 1000);
+  const pop = JSON.parse(fs.readFileSync(POP, 'utf8'));
+  const srv = await ensureService();
+  const rnd = mulberry32(20260911 + pop.orgs.length);
+  const counts = {liability: 0, accident: 0, property: 0};
+  pop.orgs.forEach(o => counts[o.engine]++);
+  const engines = ['liability', 'accident', 'property'];
+  const startTotal = pop.orgs.length;
+  for (let i = 0; i < add; i++) {
+    const engine = engines[(startTotal + i) % 3];
+    const idx = ++counts[engine];
+    const site = ORG_NAMES[engine](idx);
+    const key = execSync(`node make-key.mjs ${site} ${engine}`, {env: {...process.env, DATA_DIR: DATA}}).toString().trim();
+    const nSubj = engine === 'liability' ? 20 + Math.floor(rnd() * 30)
+                : engine === 'accident' ? 10 + Math.floor(rnd() * 40)
+                : 5 + Math.floor(rnd() * 6);
+    const subjects = [];
+    for (let s = 0; s < nSubj; s++) {
+      const highRisk = rnd() < 0.06;
+      subjects.push({
+        id: engine === 'property' ? ['crawl','kitchen','bath','attic','basement'][s % 5]
+          : engine === 'accident' ? 'V-' + String(s + 1).padStart(2, '0')
+          : 'P-' + (100 + s),
+        weekly_risk: highRisk ? 0.05 + rnd() * 0.05 : 0.002 + rnd() * 0.008,
+      });
+    }
+    pop.orgs.push({site, engine, key, subjects, coverage: 0.55 + rnd() * 0.45, joined_week: pop.tick || 0});
+    if ((i + 1) % 250 === 0) console.log('... ' + (i + 1) + ' new orgs');
+  }
+  fs.writeFileSync(POP, JSON.stringify(pop, null, 2));
+  console.log('expanded to ' + pop.orgs.length + ' orgs (' + engines.map(e => pop.orgs.filter(o => o.engine === e).length + ' ' + e).join(', ') + ')');
   if (srv) srv.kill();
 } else if (cmd === 'tick') {
   const weeks = +(process.argv[3] || 1);
