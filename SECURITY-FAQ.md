@@ -15,7 +15,7 @@ is no account, no cloud copy, no third party. Back it up with one command (in
 
 No. The service makes zero outbound network connections - it only listens on a
 port you choose. You can verify this in the source (`service.mjs`) or by watching
-its traffic. In the default shape it binds to localhost and never leaves 127.0.0.1.
+its traffic. The default Compose file publishes the service only on the host loopback interface (`127.0.0.1:8790:8790`). The Node process listens inside its container; the host port binding is the network boundary.
 
 ## How are keys handled?
 
