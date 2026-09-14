@@ -61,8 +61,7 @@ quickstart their technical contact follows is **[PILOT-QUICKSTART.md](PILOT-QUIC
 `docker compose up -d --build`, one `make-key.mjs` call, a synthetic dry-run, then
 real uploads.
 
-Self-hosted-by-us (~$5/mo VPS) remains the fallback for a buyer who cannot run a
-container; it is no longer the default and needs no decision now.
+Seller-hosted operation is outside the approved pilot shape. If a buyer cannot run a container, hosting, data access, cost, and security scope require a separate reviewed decision.
 
 ## Step 2 - replay one real week (buyer effort: one export)
 
