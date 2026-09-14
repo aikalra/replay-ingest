@@ -35,6 +35,26 @@ function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
 
+function acquireTickLock() {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const fd = fs.openSync(TICK_LOCK, 'wx');
+      fs.writeFileSync(fd, JSON.stringify({pid: process.pid, created_at: new Date().toISOString()}) + '\n');
+      return fd;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      let alive = false;
+      try {
+        const pid = JSON.parse(fs.readFileSync(TICK_LOCK, 'utf8')).pid;
+        if (Number.isInteger(pid) && pid > 0) { process.kill(pid, 0); alive = true; }
+      } catch (check) { if (check.code === 'EPERM') alive = true; }
+      if (alive) throw new Error('another tick is active');
+      fs.rmSync(TICK_LOCK, {force:true});
+    }
+  }
+  throw new Error('could not acquire tick lock');
+}
+
 async function serviceUp() {
   try { const r = await fetch(BASE + '/v1/health'); return r.ok; } catch { return false; }
 }
@@ -105,10 +125,7 @@ if (cmd === 'init') {
                 : 5 + Math.floor(rnd() * 6);
     const subjects = [];
     for (let s = 0; s < nSubj; s++) {
-      const highRisk = rnd() < 
-        
-    }
-
+      const highRisk = rnd() < 0.06;
       subjects.push({
         id: engine === 'property' ? ['crawl','kitchen','bath','attic','basement'][s % 5]
           : engine === 'accident' ? 'V-' + String(s + 1).padStart(2, '0')
@@ -126,8 +143,8 @@ if (cmd === 'init') {
   const weeks = +(process.argv[3] || 1);
   fs.mkdirSync(ECON, {recursive:true});
   let lock;
-  try { lock = fs.openSync(TICK_LOCK, 'wx'); }
-  catch { console.error('another tick is active (or tick.lock is stale)'); process.exit(1); }
+  try { lock = acquireTickLock(); }
+  catch (e) { console.error(e.message); process.exit(1); }
   try {
     // Recover a prepared commit. It is safe after a partial append because the
     // journal records the exact pre-append byte offset and chunk hash.
@@ -210,4 +227,4 @@ if (cmd === 'init') {
 } else {
   console.error('usage: node population.mjs init <orgs> | tick [weeks] | report');
   process.exit(1);
-    }
+}
