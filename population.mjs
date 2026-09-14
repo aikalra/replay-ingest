@@ -105,7 +105,10 @@ if (cmd === 'init') {
                 : 5 + Math.floor(rnd() * 6);
     const subjects = [];
     for (let s = 0; s < nSubj; s++) {
-      const highRisk = rnd() < 0.06;
+      const highRisk = rnd() < 
+        
+    }
+
       subjects.push({
         id: engine === 'property' ? ['crawl','kitchen','bath','attic','basement'][s % 5]
           : engine === 'accident' ? 'V-' + String(s + 1).padStart(2, '0')
